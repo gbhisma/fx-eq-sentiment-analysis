@@ -79,6 +79,10 @@ class OllamaClient:
 class StockPredictor:
     def __init__(self):
         self.ollama = OllamaClient()
+        # Cache for analysis results
+        self.cached_sentiments = None
+        self.cached_ticker = None
+        self.cached_overall_sentiment = None
     
     def get_stock_data(self, ticker, period="1mo"):
         """Get stock data using yfinance"""
@@ -101,8 +105,12 @@ class StockPredictor:
             st.error(f"Error fetching news data: {e}")
             return []
     
-    def analyze_news_sentiment(self, news_data):
-        """Analyze sentiment of news articles"""
+    def analyze_news_sentiment(self, news_data, ticker):
+        """Analyze sentiment of news articles with caching"""
+        # Check if we already have results for this ticker
+        if self.cached_sentiments is not None and self.cached_ticker == ticker:
+            return self.cached_sentiments
+        
         sentiments = []
         
         for article in news_data[:5]:  # Analyze top 5 news articles
@@ -124,40 +132,52 @@ class StockPredictor:
                 # Add small delay to avoid overwhelming the API
                 time.sleep(1)
         
+        # Cache the results
+        self.cached_sentiments = sentiments
+        self.cached_ticker = ticker
+        
         return sentiments
     
-    def calculate_overall_sentiment(self, sentiments):
-        """Calculate overall sentiment score"""
+    def calculate_overall_sentiment(self, sentiments, ticker):
+        """Calculate overall sentiment score with caching"""
+        # Check if we already have results for this ticker
+        if self.cached_overall_sentiment is not None and self.cached_ticker == ticker:
+            return self.cached_overall_sentiment
+        
         if not sentiments:
-            return 0, "Neutral"
-        
-        total_score = 0
-        total_weight = 0
-        
-        for sentiment in sentiments:
-            confidence = sentiment['confidence']
-            
-            if sentiment['sentiment'] == 'Positive':
-                score = confidence
-            elif sentiment['sentiment'] == 'Negative':
-                score = -confidence
-            else:
-                score = 0
-            
-            total_score += score
-            total_weight += confidence
-        
-        if total_weight == 0:
-            return 0, "Neutral"
-        
-        overall_score = total_score / total_weight
-        
-        if overall_score > 20:
-            return overall_score, "Positive"
-        elif overall_score < -20:
-            return overall_score, "Negative"
+            result = (0, "Neutral")
         else:
-            return overall_score, "Neutral"
+            total_score = 0
+            total_weight = 0
+            
+            for sentiment in sentiments:
+                confidence = sentiment['confidence']
+                
+                if sentiment['sentiment'] == 'Positive':
+                    score = confidence
+                elif sentiment['sentiment'] == 'Negative':
+                    score = -confidence
+                else:
+                    score = 0
+                
+                total_score += score
+                total_weight += confidence
+            
+            if total_weight == 0:
+                result = (0, "Neutral")
+            else:
+                overall_score = total_score / total_weight
+                
+                if overall_score > 20:
+                    result = (overall_score, "Positive")
+                elif overall_score < -20:
+                    result = (overall_score, "Negative")
+                else:
+                    result = (overall_score, "Neutral")
+        
+        # Cache the result
+        self.cached_overall_sentiment = result
+        return result
     
     def make_prediction(self, stock_data, sentiment_score, sentiment_label):
         """Make prediction based on technical and sentiment analysis"""
@@ -214,6 +234,12 @@ def main():
     # Analyze button
     if st.sidebar.button("🔍 Analyze", type="primary"):
         if ticker:
+            # Clear cache when analyzing a new ticker
+            if not hasattr(st.session_state, 'last_ticker') or st.session_state.last_ticker != ticker:
+                predictor.cached_sentiments = None
+                predictor.cached_ticker = None
+                predictor.cached_overall_sentiment = None
+                st.session_state.last_ticker = ticker
             # Create tabs for different sections
             tab1, tab2, tab3, tab4 = st.tabs(["📊 Analysis", "📰 News Sentiment", "📈 Price Chart", "🔮 Prediction"])
             
@@ -266,11 +292,11 @@ def main():
                     st.write(f"Found {len(news_data)} news articles. Analyzing top 5...")
                     
                     # Analyze sentiment
-                    sentiments = predictor.analyze_news_sentiment(news_data)
+                    sentiments = predictor.analyze_news_sentiment(news_data, ticker)
                     
                     if sentiments:
                         # Calculate overall sentiment
-                        overall_score, overall_label = predictor.calculate_overall_sentiment(sentiments)
+                        overall_score, overall_label = predictor.calculate_overall_sentiment(sentiments, ticker)
                         
                         # Display overall sentiment
                         col1, col2 = st.columns(2)
@@ -382,11 +408,16 @@ def main():
                 st.header("🔮 Prediction")
                 
                 if stock_data is not None and news_data:
-                    # Get sentiment analysis results
-                    sentiments = predictor.analyze_news_sentiment(news_data)
+                    # Get cached sentiment analysis results or use existing ones
+                    if predictor.cached_sentiments is not None and predictor.cached_ticker == ticker:
+                        sentiments = predictor.cached_sentiments
+                        overall_score, overall_label = predictor.cached_overall_sentiment
+                    else:
+                        # This should not happen if tab 2 was visited first, but just in case
+                        sentiments = predictor.analyze_news_sentiment(news_data, ticker)
+                        overall_score, overall_label = predictor.calculate_overall_sentiment(sentiments, ticker)
                     
                     if sentiments:
-                        overall_score, overall_label = predictor.calculate_overall_sentiment(sentiments)
                         
                         # Make prediction
                         prediction, prediction_score = predictor.make_prediction(
