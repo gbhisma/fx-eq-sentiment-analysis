@@ -46,8 +46,8 @@ This is a beginner-friendly, AI-powered application for predicting stock and for
 
 ```bash
 # Via Git (recommended)
-git clone https://github.com/yourusername/news-stock-predictor.git
-cd news-stock-predictor
+git clone https://github.com/gbhisma/fx-eq-sentiment-analysis.git
+cd fx-eq-sentiment-analysis
 
 # Or download ZIP and extract manually
 ```
