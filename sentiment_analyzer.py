@@ -32,7 +32,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json={
-                    "model": "deepseek-r1:1.5b",
+                    "model": "llama3",
                     "prompt": prompt,
                     "stream": False
                 }
