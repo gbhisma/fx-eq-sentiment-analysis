@@ -1,20 +1,23 @@
-# Change this to your virtual environment folder if different
-$venvPath = ".\.venv\Scripts\activate"
+@echo off
+SETLOCAL
 
-# Check if Ollama is running
-$ollamaRunning = (Get-Process -Name "ollama" -ErrorAction SilentlyContinue)
+REM === Set your virtual environment activation path ===
+SET VENV_PATH=.venv\Scripts\activate.bat
 
-if (-not $ollamaRunning) {
-    Write-Host "Starting Ollama..."
-    Start-Process -NoNewWindow -FilePath "ollama" -ArgumentList "run llama3"
-    Start-Sleep -Seconds 5
-} else {
-    Write-Host "Ollama is already running."
-}
+REM === Check if Ollama is already running ===
+tasklist /FI "IMAGENAME eq ollama.exe" | find /I "ollama.exe" >nul
+IF ERRORLEVEL 1 (
+    echo Ollama is not running. Starting Ollama with Llama3...
+    start "" /MIN cmd /c "ollama run llama3"
+    timeout /t 5 >nul
+) ELSE (
+    echo Ollama is already running.
+)
 
-# Activate virtual environment and launch Streamlit
-Write-Host "Activating virtual environment..."
-& $venvPath
+REM === Activate virtual environment ===
+CALL %VENV_PATH%
 
-Write-Host "Launching Streamlit app..."
+REM === Run the Streamlit app ===
 streamlit run main.py
+
+ENDLOCAL
