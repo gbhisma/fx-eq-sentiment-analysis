@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 def main():
-    st.title("📈 Stock/Forex Predictor with News Sentiment Analysis")
+    st.title("📈 S.M.A.R.T. Sentiment Market Analysis and Response Toolkit")
     st.markdown("### Predict market movements using AI-powered news sentiment analysis and SARIMAX forecasting")
     
     # Initialize components
